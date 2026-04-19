@@ -116,6 +116,21 @@ fastify.get('/nif/validate/:nif', {
 
 fastify.get('/health', async () => ({ status: 'ok', version: '1.0.0' }));
 
+// ── Meta ──────────────────────────────────────────────────────────────────────
+const META_RESPONSE = {
+  service: 'connector-nif',
+  version: '1.0.0',
+  description: 'Portuguese NIF (Tax ID) validator using MOD 11 algorithm',
+  source: 'Internal validation (no external API required)',
+  endpoints: [
+    { path: '/v1/nif/validate/:nif', description: 'Validate a Portuguese NIF' },
+    { path: '/v1/nif/meta', description: 'Service metadata' }
+  ]
+};
+
+fastify.get('/meta', async () => META_RESPONSE);
+fastify.get('/nif/meta', async () => META_RESPONSE);
+
 // ── Start ───────────────────────────────────────────────────────────────────
 const start = async () => {
   try {
