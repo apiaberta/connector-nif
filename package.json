@@ -1,0 +1,16 @@
+{
+  "name": "apiaberta-nif",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Portuguese NIF validator connector for API Aberta",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@fastify/swagger": "^8.15.0",
+    "@fastify/swagger-ui": "^4.2.0",
+    "dotenv": "^16.4.5",
+    "fastify": "^4.28.1"
+  }
+}
