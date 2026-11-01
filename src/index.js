@@ -2,8 +2,11 @@ import 'dotenv/config';
 import Fastify from 'fastify';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
+import mongoose from 'mongoose';
+import { lookupCompany } from './lookup.js';
 
 const PORT = parseInt(process.env.PORT || '3013', 10);
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/apiaberta-nif';
 
 // Flat string types — no nested objects
 const NIF_TYPES = {
@@ -114,16 +117,47 @@ fastify.get('/nif/validate/:nif', {
   }
 });
 
+fastify.get('/nif/:nif', {
+  schema: {
+    description: 'Informação de uma empresa por NIF (VIES, cache de 30 dias)',
+    tags: ['NIF'],
+    params: {
+      type: 'object',
+      properties: {
+        nif: { type: 'string', description: 'NIF (9 dígitos, aceita prefixo PT)' }
+      },
+      required: ['nif']
+    },
+    querystring: {
+      type: 'object',
+      properties: { refresh: { type: 'boolean' } }
+    }
+  }
+}, async (request, reply) => {
+  const nif = String(request.params.nif).replace(/\s+/g, '').replace(/^PT/i, '');
+  const result = validateNIF(nif);
+  if (!result.valid) {
+    return reply.code(400).send({ nif, valid: false, reason: result.reason });
+  }
+  const { status, body } = await lookupCompany(nif, getNIFType(nif), {
+    refresh: request.query.refresh === true,
+    log: fastify.log
+  });
+  return reply.code(status).send(body);
+});
+
 fastify.get('/health', async () => ({ status: 'ok', version: '1.0.0' }));
 
 // ── Meta ──────────────────────────────────────────────────────────────────────
 const META_RESPONSE = {
   service: 'connector-nif',
   version: '1.0.0',
-  description: 'Portuguese NIF (Tax ID) validator using MOD 11 algorithm',
-  source: 'Internal validation (no external API required)',
+  description: 'Portuguese NIF validator (MOD 11) and company lookup by NIF',
+  source: 'Internal validation; company data from EU VIES (https://ec.europa.eu/taxation_customs/vies/)',
+  update_freq: 'on demand, cached 30 days',
   endpoints: [
     { path: '/v1/nif/validate/:nif', description: 'Validate a Portuguese NIF' },
+    { path: '/v1/nif/:nif', description: 'Company name and address by NIF (?refresh=true bypasses cache)' },
     { path: '/v1/nif/meta', description: 'Service metadata' }
   ]
 };
@@ -134,6 +168,7 @@ fastify.get('/nif/meta', async () => META_RESPONSE);
 // ── Start ───────────────────────────────────────────────────────────────────
 const start = async () => {
   try {
+    await mongoose.connect(MONGODB_URI);
     await fastify.listen({ port: PORT, host: '0.0.0.0' });
     console.log(`API Aberta NIF connector running on port ${PORT}`);
     console.log(`Swagger docs available at http://localhost:${PORT}/docs`);
